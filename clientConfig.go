@@ -1,7 +1,9 @@
 package kratos
 
 import (
+	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -31,11 +33,13 @@ type ClientConfig struct {
 	ModelName            string
 	Manufacturer         string
 	DestinationURL       string
+	Token                string
 	OutboundQueue        QueueConfig
 	WRPEncoderQueue      QueueConfig
 	WRPDecoderQueue      QueueConfig
 	HandlerRegistryQueue QueueConfig
 	HandleMsgQueue       QueueConfig
+	TlsConfig            *tls.Config
 	Handlers             []HandlerConfig
 	HandlePingMiss       HandlePingMiss
 	ClientLogger         log.Logger
@@ -64,9 +68,10 @@ func NewClient(config ClientConfig) (Client, error) {
 		firmwareName: config.FirmwareName,
 		modelName:    config.ModelName,
 		manufacturer: config.Manufacturer,
+		token:        config.Token,
 	}
 
-	newConnection, connectionURL, err := createConnection(inHeader, config.DestinationURL)
+	newConnection, connectionURL, err := createConnection(inHeader, config.DestinationURL, config.TlsConfig)
 
 	if err != nil {
 		return nil, err
@@ -133,7 +138,7 @@ func NewClient(config ClientConfig) (Client, error) {
 }
 
 // private func used to generate the client that we're looking to produce
-func createConnection(headerInfo *clientHeader, httpURL string) (connection *websocket.Conn, wsURL string, err error) {
+func createConnection(headerInfo *clientHeader, httpURL string, tlsConfig *tls.Config) (connection *websocket.Conn, wsURL string, err error) {
 	_, err = device.ParseID(headerInfo.deviceName)
 
 	if err != nil {
@@ -147,18 +152,21 @@ func createConnection(headerInfo *clientHeader, httpURL string) (connection *web
 	headers.Add("X-Webpa-Firmware-Name", headerInfo.firmwareName)
 	headers.Add("X-Webpa-Model-Name", headerInfo.modelName)
 	headers.Add("X-Webpa-Manufacturer", headerInfo.manufacturer)
+	headers.Add("Authorization", fmt.Sprintf("Bearer %s", headerInfo.token))
 
 	// make sure destUrl's protocol is websocket (ws)
 	wsURL = strings.Replace(httpURL, "http", "ws", 1)
 
 	// creates a new client connection given the URL string
-	connection, resp, err := websocket.DefaultDialer.Dial(wsURL, headers)
+	dialer := websocket.DefaultDialer
+	dialer.TLSClientConfig = tlsConfig
+	connection, resp, err := dialer.Dial(wsURL, headers)
 
-	for ;err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect; {
+	for err == websocket.ErrBadHandshake && resp != nil && resp.StatusCode == http.StatusTemporaryRedirect {
 		// Get url to which we are redirected and reconfigure it
 		wsURL = strings.Replace(resp.Header.Get("Location"), "http", "ws", 1)
 
-		connection, resp, err = websocket.DefaultDialer.Dial(wsURL, headers)
+		connection, resp, err = dialer.Dial(wsURL, headers)
 	}
 
 	if err != nil {
