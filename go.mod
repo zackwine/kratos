@@ -1,4 +1,4 @@
-module github.com/xmidt-org/kratos
+module github.com/stepherg/kratos
 
 go 1.13
 
