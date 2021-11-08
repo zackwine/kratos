@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/stepherg/kratos"
+	"github.com/zackwine/kratos"
 	"github.com/xmidt-org/webpa-common/logging"
 	"github.com/xmidt-org/wrp-go/v3"
 )

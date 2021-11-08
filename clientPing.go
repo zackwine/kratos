@@ -44,9 +44,14 @@ func (c *client) checkPing(inTimer *time.Timer, pinged <-chan string) {
 				logging.Info(c.logger).Log(logging.MessageKey(), "Error handling ping miss:", logging.ErrorKey(), err)
 			}
 			if count >= c.pingConfig.MaxPingMiss {
-				logging.Error(c.logger).Log(logging.MessageKey(), "Ping miss, exiting ping loop")
-				pingMiss = true
+				if c.pingConfig.ReconnectOnMiss {
+					c.RequestReconnect()
+				} else {
+					logging.Error(c.logger).Log(logging.MessageKey(), "Ping miss, exiting ping loop")
+					pingMiss = true
+				}
 			}
+
 			logging.Debug(c.logger).Log(logging.MessageKey(), "Resetting ping timer")
 			inTimer.Reset(c.pingConfig.PingWait)
 		}

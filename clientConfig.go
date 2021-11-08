@@ -53,8 +53,9 @@ type QueueConfig struct {
 }
 
 type PingConfig struct {
-	PingWait    time.Duration
-	MaxPingMiss int
+	PingWait        time.Duration
+	MaxPingMiss     int
+	ReconnectOnMiss bool
 }
 
 // NewClient is used to create a new kratos Client from a ClientConfig.
@@ -116,6 +117,8 @@ func NewClient(config ClientConfig) (Client, error) {
 		done:            make(chan struct{}, 1),
 		logger:          logger,
 		pingConfig:      config.PingConfig,
+		config:          config,
+		connected:       true,
 	}
 
 	newClient.registry, err = NewHandlerRegistry(config.Handlers)
